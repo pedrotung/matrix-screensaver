@@ -31,6 +31,6 @@ The screensaver password cannot block Ctrl+Alt+Del or a forced shutdown. To real
 
 ## Build from source
 
-On Ubuntu, run `apt install mingw-w64`, then `sh build.sh`. The glyphs are pre-rendered into `glyphs.h`. To regenerate them, download VT323.ttf from Google Fonts and run `python3 tools/gen_glyphs.py <ipag.ttf> <VT323.ttf> glyphs.h`.
+On Ubuntu, run `apt install mingw-w64`, then `sh build.sh`. The glyphs are pre-rendered into `glyphs.h`. To regenerate them, download VT323.ttf from Google Fonts and run `python3 tools/gen_glyphs.py <ipag.ttf> <VT323.ttf> ../core/glyphs.h`.
 
 Fonts: the rain glyphs come from IPAGothic (IPA Font License); the terminal glyphs come from VT323 (SIL Open Font License).

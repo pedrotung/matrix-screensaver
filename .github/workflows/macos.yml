@@ -1,0 +1,22 @@
+name: Build macOS screensaver
+
+on:
+  push:
+    paths: ["macos/**", "core/**", ".github/workflows/macos.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build MatrixRain.saver
+        run: sh macos/build.sh
+      - name: Check the bundle
+        run: |
+          file macos/build/MatrixRain.saver/Contents/MacOS/MatrixRain
+          codesign --verify --verbose macos/build/MatrixRain.saver
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MatrixRain-macos
+          path: macos/build/MatrixRain-macos.zip

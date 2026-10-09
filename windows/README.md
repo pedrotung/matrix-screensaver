@@ -33,6 +33,6 @@ English version: [README-en.md](README-en.md)
 
 ## 从源码编译
 
-在 Ubuntu 上执行 `apt install mingw-w64`，然后运行 `sh build.sh`。字形已经预先做成位图放在 `glyphs.h` 里。若要重新生成，先从 Google Fonts 下载 VT323.ttf，再运行 `python3 tools/gen_glyphs.py <ipag.ttf> <VT323.ttf> glyphs.h`。
+在 Ubuntu 上执行 `apt install mingw-w64`，然后运行 `sh build.sh`。字形已经预先做成位图放在 `glyphs.h` 里。若要重新生成，先从 Google Fonts 下载 VT323.ttf，再运行 `python3 tools/gen_glyphs.py <ipag.ttf> <VT323.ttf> ../core/glyphs.h`。
 
 字体：数字雨字符取自 IPAGothic（IPA Font License），终端字符取自 VT323（SIL Open Font License）。

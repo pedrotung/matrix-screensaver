@@ -2,3 +2,4 @@ windows/*.o
 windows/MatrixRain.scr
 windows/fonts/
 __pycache__/
+macos/build/
