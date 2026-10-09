@@ -1,5 +1,7 @@
 # Matrix 数字雨屏保（Windows 版）
 
+English version: [README-en.md](README-en.md)
+
 `MatrixRain.scr` 是一个独立的 64 位 Windows 屏保，Windows 10 / 11 均可用，不需要另外安装运行库或字体。
 
 ## 安装
