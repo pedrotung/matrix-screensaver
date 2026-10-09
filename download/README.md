@@ -11,6 +11,10 @@
 
 The zip contains `MatrixRain.scr`, `README-en.md` (English guide) and `使用说明.md` (Chinese guide).
 
+### macOS
+
+**`MatrixRain-macos.zip`** is the screensaver for **macOS 10.15+** (Apple silicon and Intel). Unzip it, then follow the [macOS install guide](../macos/README.md#english). It is not notarized by Apple, so you need one Terminal command (or **Open Anyway** in Privacy & Security) before installing.
+
 ## 中文
 
 **`MatrixRain-windows.zip`** 是可以直接使用的 **Windows 10 / 11** 屏保。点上面的文件名，再点右侧的下载按钮（↓）即可下载。也可以到 [Releases 页面](https://github.com/pedrotung/matrix-screensaver/releases/latest) 下载。
@@ -21,3 +25,7 @@ The zip contains `MatrixRain.scr`, `README-en.md` (English guide) and `使用说
 4. 如果出现「Windows 已保护你的电脑」，点「更多信息」再点「仍要运行」。这是因为程序没有数字签名。
 
 压缩包里有 `MatrixRain.scr`、`README-en.md`（英文说明）和 `使用说明.md`（中文说明）。
+
+### macOS
+
+**`MatrixRain-macos.zip`** 是 **macOS 10.15 及以上**（Apple 芯片和 Intel 芯片）用的屏保。解压后按 [macOS 安装说明](../macos/README.md#中文) 操作。它没有经过 Apple 公证，安装前需要在终端运行一条命令（或在「隐私与安全性」里点「仍要打开」）。

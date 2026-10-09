@@ -2,7 +2,9 @@
 
 **[English](#english) | [中文](#中文)**
 
-**⬇ Download / 下载：[MatrixRain-windows.zip](https://github.com/pedrotung/matrix-screensaver/releases/latest/download/MatrixRain-windows.zip)** (Windows 10 / 11 · [Releases](https://github.com/pedrotung/matrix-screensaver/releases/latest))
+**⬇ Download / 下载**
+- **Windows 10 / 11:** [MatrixRain-windows.zip](https://github.com/pedrotung/matrix-screensaver/releases/latest/download/MatrixRain-windows.zip) ([Releases](https://github.com/pedrotung/matrix-screensaver/releases/latest))
+- **macOS 10.15+ (Apple silicon & Intel):** [MatrixRain-macos.zip](https://github.com/pedrotung/matrix-screensaver/raw/main/download/MatrixRain-macos.zip) · [install guide / 安装说明](macos/README.md)
 
 ---
 
@@ -20,6 +22,10 @@ This is my first project built with AI-assisted programming. It is free and open
 4. The program is not code-signed. If Windows shows "Windows protected your PC", click **More info**, then **Run anyway**.
 
 No extra runtime or fonts are needed. The file is about 650 KB.
+
+### macOS
+
+A macOS version (`MatrixRain.saver`) is in [download/MatrixRain-macos.zip](download/MatrixRain-macos.zip). macOS shows its own lock screen when a screensaver ends, so the Mac version uses your Mac's login password instead of its own, and plays the "Wake up, Neo" terminal as an interlude every 3 minutes. See the [macOS install guide](macos/README.md#english).
 
 ### Settings
 
@@ -72,6 +78,10 @@ MIT, see [LICENSE](LICENSE).
 
 程序没有数字签名，第一次运行如果出现「Windows 已保护你的电脑」，点「更多信息」再点「仍要运行」。详细说明见 [windows/README.md](windows/README.md)。
 
+### macOS 版
+
+macOS 版（`MatrixRain.saver`）在 [download/MatrixRain-macos.zip](download/MatrixRain-macos.zip)。macOS 在屏保结束时会显示系统自己的锁屏，所以 Mac 版用 Mac 的登录密码代替自定义密码，Wake up, Neo 终端画面改为每 3 分钟播放一次。安装方法见 [macOS 安装说明](macos/README.md#中文)。
+
 ### 网页版
 
 [web/index.html](web/index.html) 是单文件网页版，下载后用浏览器打开即可，功能和 Windows 版一样：可调速度、密度、字号，可设置退出密码。网页版只是效果演示，关闭标签页就能退出，不能真正锁住电脑。
@@ -85,8 +95,10 @@ MIT, see [LICENSE](LICENSE).
 | 路径 | 内容 |
 | --- | --- |
 | `web/index.html` | 网页版（HTML + Canvas） |
+| `core/` | Windows 和 macOS 共用的绘制代码 |
 | `windows/` | Windows 屏保源码（C++ / Win32，MinGW-w64 交叉编译） |
-| `download/` | 编译好的 Windows 屏保压缩包 |
+| `macos/` | macOS 屏保源码（Objective-C++ / ScreenSaver 框架） |
+| `download/` | 编译好的 Windows 和 macOS 屏保压缩包 |
 
 ### 许可证
 
