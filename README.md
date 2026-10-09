@@ -4,7 +4,7 @@
 
 **⬇ Download / 下载**
 - **Windows 10 / 11:** [MatrixRain-windows.zip](https://github.com/pedrotung/matrix-screensaver/releases/latest/download/MatrixRain-windows.zip) ([Releases](https://github.com/pedrotung/matrix-screensaver/releases/latest))
-- **macOS 10.15+ (Apple silicon & Intel):** [MatrixRain-macos.zip](https://github.com/pedrotung/matrix-screensaver/raw/main/download/MatrixRain-macos.zip) · [install guide / 安装说明](macos/README.md)
+- **macOS 10.15+ (Apple silicon & Intel):** [MatrixRain-macos.zip](https://github.com/pedrotung/matrix-screensaver/releases/latest/download/MatrixRain-macos.zip) · [install guide / 安装说明](macos/README.md)
 
 ---
 
