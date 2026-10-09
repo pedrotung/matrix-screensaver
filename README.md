@@ -2,7 +2,7 @@
 
 **[English](#english) | [中文](#中文)**
 
-**⬇ Download / 下载：[Releases 页面 / Releases page](https://github.com/pedrotung/matrix-screensaver/releases/latest)** → `MatrixRain-windows.zip`
+**⬇ Download / 下载：[MatrixRain-windows.zip](https://github.com/pedrotung/matrix-screensaver/releases/latest/download/MatrixRain-windows.zip)** (Windows 10 / 11 · [Releases](https://github.com/pedrotung/matrix-screensaver/releases/latest))
 
 ---
 
