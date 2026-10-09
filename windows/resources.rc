@@ -1,0 +1,33 @@
+#pragma code_page(65001)
+#include <windows.h>
+
+1 ICON "matrix.ico"
+1 24 "app.manifest"
+
+// String 1 is the name Windows shows in the screen saver list.
+STRINGTABLE
+BEGIN
+  1 "Matrix 数字雨"
+END
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILETYPE VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "080404b0"
+    BEGIN
+      VALUE "FileDescription", "Matrix 数字雨屏幕保护程序"
+      VALUE "ProductName", "Matrix 数字雨"
+      VALUE "FileVersion", "1.0.0"
+      VALUE "ProductVersion", "1.0.0"
+      VALUE "OriginalFilename", "MatrixRain.scr"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0804, 1200
+  END
+END

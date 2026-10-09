@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>html,body{margin:0}[hidden]{display:none!important}</style>
+<title>Matrix 数字雨</title>
+<style>
+  /* Layout: full-bleed rain canvas; a control strip that fades when the mouse rests;
+     a full-screen Apple II style green-phosphor terminal for the unlock sequence. Single dark look by design. */
+  :root {
+    --void: #000300;
+    --phosphor: #00ff41;
+    --phosphor-dim: #008f11;
+    --glass: rgba(0, 18, 4, 0.78);
+    --edge: rgba(0, 255, 65, 0.28);
+    --crt: #39ff5a;            /* Apple II monitor green */
+    --crt-bg: #020a03;
+    --alert: #ffb000;
+    --type-ui: "Share Tech Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --type-crt: "VT323", "Share Tech Mono", ui-monospace, monospace;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { background: var(--void); color: var(--phosphor); overflow: hidden; font-family: var(--type-ui); }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  body.idle, body.idle canvas, body.locked, body.locked canvas { cursor: none; }
+
+  /* Control strip */
+  .hud {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: min(760px, calc(100% - 32px));
+    display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: center;
+    padding: 12px 16px; background: var(--glass); border: 1px solid var(--edge); border-radius: 4px;
+    font-size: 13px; letter-spacing: 0.04em; backdrop-filter: blur(4px);
+    transition: opacity .6s ease;
+  }
+  body.idle .hud, body.locked .hud { opacity: 0; pointer-events: none; }
+  .hud label { display: flex; align-items: center; gap: 8px; color: var(--phosphor); }
+  .hud input[type="range"] { width: 96px; accent-color: var(--phosphor); }
+  .hud input[type="password"] {
+    font: inherit; color: var(--phosphor); background: rgba(0,0,0,.6); border: 1px solid var(--edge);
+    border-radius: 2px; padding: 5px 8px; width: 170px;
+  }
+  .hud input::placeholder { color: var(--phosphor-dim); }
+  .hud button {
+    font: inherit; color: var(--void); background: var(--phosphor); border: 0; border-radius: 2px;
+    padding: 6px 12px; cursor: pointer; letter-spacing: 0.06em;
+  }
+  .hud button.ghost { background: transparent; color: var(--phosphor); border: 1px solid var(--edge); }
+  .hud button:focus-visible, .hud input:focus-visible { outline: 2px solid var(--phosphor); outline-offset: 2px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: center; width: 100%; }
+  .row.lock { border-top: 1px solid var(--edge); padding-top: 10px; }
+  .hint { color: var(--phosphor-dim); font-size: 12px; width: 100%; text-align: center; }
+  .hint.warn { color: var(--alert); }
+
+  /* Apple II terminal */
+  .crt {
+    position: fixed; inset: 0; background: var(--crt-bg); color: var(--crt);
+    font-family: var(--type-crt); font-size: clamp(22px, 4.6vw, 52px); line-height: 1.15;
+    padding: calc(6vh + env(safe-area-inset-top, 0px)) 6vw;
+    text-shadow: 0 0 2px var(--crt), 0 0 10px rgba(57,255,90,.55), 0 0 22px rgba(57,255,90,.25);
+    animation: flicker 0.12s infinite steps(2);
+    overflow: hidden;
+  }
+  .crt::before { /* scanlines */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,.38) 3px, rgba(0,0,0,0) 4px);
+  }
+  .crt::after { /* tube vignette */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.75) 100%);
+  }
+  .crt pre { margin: 0; font: inherit; white-space: pre-wrap; word-break: break-all; position: relative; }
+  .cursor { display: inline-block; width: .5em; height: 1em; vertical-align: -0.12em; background: var(--crt); box-shadow: 0 0 10px var(--crt); animation: blink 1.06s steps(1) infinite; }
+  .cursor.solid { animation: none; }
+  .crt input { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes flicker { 0% { opacity: .97; } 100% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .crt { animation: none; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap">
+</head>
+<body>
+<canvas id="rain" aria-label="Matrix 绿色字符雨动画"></canvas>
+
+<div class="hud" id="hud">
+  <div class="row">
+    <label for="speed">速度 <input id="speed" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
+    <label for="density">密度 <input id="density" type="range" min="0.3" max="1" step="0.05" value="0.85"></label>
+    <label for="size">字号 <input id="size" type="range" min="12" max="32" step="1" value="18"></label>
+    <button id="pause" class="ghost" type="button">暂停</button>
+    <button id="full" class="ghost" type="button">全屏</button>
+  </div>
+  <div class="row lock" id="lockRow">
+    <label for="pw">退出密码 <input id="pw" type="password" placeholder="设置退出密码" autocomplete="new-password"></label>
+    <button id="lock" type="button">启动屏保</button>
+    <button id="demo" class="ghost" type="button">预览退出动画</button>
+  </div>
+  <div class="hint" id="hint">启动后移动鼠标或按键，需要输入密码才能退出 · 空格暂停 · F 全屏</div>
+</div>
+
+<div class="crt" id="crt" hidden>
+  <pre id="screen"></pre>
+  <input id="typed" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="输入退出密码">
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const canvas = $('rain');
+  const ctx = canvas.getContext('2d');
+
+  /* ---------- Digital rain ---------- */
+  // Half-width katakana (drawn mirrored, as in the film), digits and a few symbols.
+  const GLYPHS = 'ｦｱｳｴｵｶｷｹｺｻｼｽｾｿﾀﾂﾃﾅﾆﾇﾈﾊﾋﾎﾏﾐﾑﾒﾓﾔﾕﾗﾘﾜ0123456789Z:・."=*+-<>¦｜';
+  const pick = () => GLYPHS[(Math.random() * GLYPHS.length) | 0];
+
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cfg = { speed: reduced ? 0.4 : 1, density: 0.85, size: 18 };
+  $('speed').value = cfg.speed;
+
+  let W, H, dpr, drops, paused = false, rainOn = true;
+
+  function makeDrop(x, startAbove) {
+    return {
+      x,
+      y: startAbove ? -Math.random() * H * 1.5 : Math.random() * H,
+      v: 0.55 + Math.random() * 0.9,
+      len: 8 + ((Math.random() * 26) | 0),
+      chars: [],
+      active: Math.random() < cfg.density
+    };
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const cols = Math.ceil(W / cfg.size);
+    drops = Array.from({ length: cols }, (_, i) => makeDrop(i * cfg.size, false));
+    ctx.fillStyle = '#000300'; ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawGlyph(ch, x, y) {
+    const s = cfg.size;
+    if (ch > 'ÿ') { ctx.save(); ctx.translate(x + s, y); ctx.scale(-1, 1); ctx.fillText(ch, 0, 0); ctx.restore(); }
+    else ctx.fillText(ch, x + s * 0.18, y);
+  }
+
+  function step(dt) {
+    const s = cfg.size;
+    ctx.fillStyle = 'rgba(0, 3, 0, 0.09)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = `${s}px "Share Tech Mono", "MS Gothic", "Hiragino Kaku Gothic ProN", monospace`;
+    ctx.textBaseline = 'top';
+
+    for (const d of drops) {
+      if (!d.active) {
+        if (Math.random() < 0.004 * cfg.density) { Object.assign(d, makeDrop(d.x, true)); d.y = -s; d.active = true; }
+        continue;
+      }
+      const prevRow = Math.floor(d.y / s);
+      d.y += d.v * cfg.speed * s * 0.35 * dt;
+      const row = Math.floor(d.y / s);
+      for (let r = prevRow + 1; r <= row; r++) d.chars.unshift(pick());
+      if (d.chars.length > d.len) d.chars.length = d.len;
+      if (d.chars.length > 2 && Math.random() < 0.06) d.chars[1 + ((Math.random() * (d.chars.length - 1)) | 0)] = pick();
+
+      for (let i = 1; i < d.chars.length; i++) {
+        const y = (row - i) * s;
+        if (y < -s || y > H) continue;
+        const a = 1 - i / d.chars.length;
+        ctx.fillStyle = `rgba(0, ${150 + (a * 105) | 0}, ${30 + (a * 35) | 0}, ${0.35 + a * 0.65})`;
+        drawGlyph(d.chars[i], d.x, y);
+      }
+      if (row * s < H && d.chars[0]) {
+        ctx.save();
+        ctx.shadowColor = '#00ff41'; ctx.shadowBlur = 14;
+        ctx.fillStyle = '#e8ffe8';
+        drawGlyph(d.chars[0], d.x, row * s);
+        ctx.restore();
+      }
+      if ((row - d.len) * s > H) {
+        const on = Math.random() < cfg.density;
+        Object.assign(d, makeDrop(d.x, true), { active: on });
+      }
+    }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min((now - last) / 16.67, 3);
+    last = now;
+    if (!paused && rainOn) step(dt);
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------- Controls ---------- */
+  $('speed').addEventListener('input', e => cfg.speed = +e.target.value);
+  $('density').addEventListener('input', e => {
+    cfg.density = +e.target.value;
+    drops.forEach(d => { if (Math.random() > cfg.density) d.active = false; });
+  });
+  $('size').addEventListener('input', e => { cfg.size = +e.target.value; resize(); });
+  const togglePause = () => { paused = !paused; $('pause').textContent = paused ? '继续' : '暂停'; };
+  $('pause').addEventListener('click', togglePause);
+  const goFull = () => { try { document.documentElement.requestFullscreen?.().catch(() => {}); } catch (_) {} };
+  const toggleFull = () => {
+    try { document.fullscreenElement ? document.exitFullscreen() : goFull(); } catch (_) {}
+  };
+  $('full').addEventListener('click', toggleFull);
+
+  /* ---------- Password ---------- */
+  const KEY = 'matrix-saver-pw';
+  let memHash = null;
+  const store = {
+    get() { try { return localStorage.getItem(KEY) || memHash; } catch (_) { return memHash; } },
+    set(v) { memHash = v; try { localStorage.setItem(KEY, v); } catch (_) {} }
+  };
+  async function hash(text) {
+    const data = new TextEncoder().encode('zion::' + text);
+    try {
+      const buf = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+    } catch (_) { // fallback when SubtleCrypto is unavailable
+      let h = 2166136261; for (const b of data) { h ^= b; h = Math.imul(h, 16777619); } return 'f' + (h >>> 0).toString(16);
+    }
+  }
+  const hint = $('hint');
+  const defaultHint = hint.textContent;
+  const refreshPwUi = () => { $('pw').placeholder = store.get() ? '已设置（留空沿用）' : '设置退出密码'; };
+  refreshPwUi();
+
+  /* ---------- States: idle → locked → terminal → unlocked ---------- */
+  let mode = 'free'; // free | locked | terminal
+  let demo = false;
+
+  // A plain button, not a form: the preview frame blocks form submission, so a submit handler never runs there.
+  async function startSaver() {
+    const v = $('pw').value;
+    if (!v && !store.get()) { hint.textContent = '请先设置退出密码'; hint.classList.add('warn'); $('pw').focus(); return; }
+    goFull(); // must run inside the click, before any await
+    if (v) { store.set(await hash(v)); $('pw').value = ''; refreshPwUi(); }
+    hint.textContent = defaultHint; hint.classList.remove('warn');
+    $('pw').blur();
+    lock();
+  }
+  $('lock').addEventListener('click', startSaver);
+  $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); startSaver(); } });
+  $('demo').addEventListener('click', () => { demo = true; mode = 'locked'; document.body.classList.add('locked'); openTerminal(); });
+
+  let armedAt = 0, origin = null;
+  function lock() {
+    mode = 'locked'; demo = false;
+    document.body.classList.add('locked');
+    armedAt = performance.now(); origin = null;
+  }
+  function unlock() {
+    mode = 'free';
+    document.body.classList.remove('locked');
+    closeTerminal();
+    wake();
+  }
+
+  // Any real activity while locked opens the terminal. Ignore the first second and tiny mouse jitter.
+  function onActivity(e) {
+    if (mode !== 'locked' || performance.now() - armedAt < 1000) return;
+    if (e.type === 'mousemove') {
+      if (!origin) { origin = { x: e.clientX, y: e.clientY }; return; }
+      if (Math.hypot(e.clientX - origin.x, e.clientY - origin.y) < 12) return;
+    }
+    if (e.type === 'keydown') e.preventDefault();
+    openTerminal();
+  }
+  ['mousemove', 'mousedown', 'touchstart', 'keydown', 'wheel'].forEach(ev => addEventListener(ev, onActivity, { passive: false }));
+
+  /* ---------- Apple II terminal ---------- */
+  const crt = $('crt'), screen = $('screen'), typed = $('typed');
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let runId = 0, accepting = false, idleTimer = null;
+
+  function render(text, cursor = true, solid = false) {
+    screen.textContent = text;
+    if (cursor) { const c = document.createElement('span'); c.className = 'cursor' + (solid ? ' solid' : ''); screen.appendChild(c); }
+  }
+
+  async function typeOut(id, text, { pre = '', speed = 90 } = {}) {
+    let out = '';
+    for (const ch of text) {
+      if (id !== runId) return false;
+      out += ch;
+      render(pre + out, true, true);
+      await sleep(speed * (0.5 + Math.random()) + (/[,.]/.test(ch) ? speed : 0));
+    }
+    render(pre + out);
+    return id === runId;
+  }
+
+  async function openTerminal() {
+    if (mode === 'terminal') return;
+    mode = 'terminal';
+    const id = ++runId;
+    rainOn = false;
+    crt.hidden = false;
+    accepting = false;
+    render('');
+    await sleep(300);
+    const lines = ['Wake up, Neo...', 'Follow the white rabbit.'];
+    for (const line of lines) {
+      if (!(await typeOut(id, line, { speed: 45 }))) return;
+      await sleep(1100);
+      if (id !== runId) return;
+      render(''); await sleep(250);
+    }
+    if (id !== runId) return;
+    showPrompt('');
+  }
+
+  const PROMPT = ']PASSWORD: ';
+  function showPrompt(note) {
+    accepting = true;
+    typed.value = '';
+    render(note + PROMPT);
+    focusTyped();
+    armIdle();
+  }
+  function focusTyped() { try { typed.focus({ preventScroll: true }); } catch (_) {} }
+  crt.addEventListener('pointerdown', () => accepting && setTimeout(focusTyped, 0));
+
+  // Mirror what is typed as asterisks in the same terminal font.
+  typed.addEventListener('input', () => {
+    if (!accepting) { typed.value = ''; return; }
+    const note = screen.dataset.note || '';
+    render(note + PROMPT + '*'.repeat(typed.value.length));
+    armIdle();
+  });
+  typed.addEventListener('keydown', async e => {
+    if (e.key === 'Escape') { e.preventDefault(); typed.value = ''; typed.dispatchEvent(new Event('input')); return; }
+    if (e.key !== 'Enter' || !accepting) return;
+    e.preventDefault();
+    accepting = false;
+    const ok = demo ? true : (await hash(typed.value)) === store.get();
+    const id = runId;
+    const shown = PROMPT + '*'.repeat(typed.value.length) + '\n\n';
+    if (ok) {
+      await typeOut(id, demo ? 'DEMO MODE. ACCESS GRANTED.' : 'ACCESS GRANTED.', { pre: shown, speed: 25 });
+      await sleep(600);
+      if (id === runId) unlock();
+    } else {
+      await typeOut(id, '?ACCESS DENIED', { pre: shown, speed: 25 });
+      await sleep(800);
+      if (id !== runId) return;
+      screen.dataset.note = '';
+      showPrompt('');
+    }
+  });
+
+  // Nobody typing for 30 s: go back to the rain, still locked.
+  function armIdle() {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (mode === 'terminal' && accepting) relock(); }, 30000);
+  }
+  function relock() {
+    runId++; accepting = false; typed.blur(); crt.hidden = true; rainOn = true;
+    if (demo) { unlock(); return; }
+    lock();
+  }
+  function closeTerminal() {
+    runId++; accepting = false; clearTimeout(idleTimer); typed.blur(); crt.hidden = true; rainOn = true;
+  }
+
+  // Keyboard shortcuts when not locked.
+  addEventListener('keydown', e => {
+    if (mode !== 'free' || e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+    if (e.key === 'f' || e.key === 'F') toggleFull();
+  });
+
+  // Hide HUD and cursor when the mouse rests.
+  let hudTimer;
+  function wake() {
+    if (mode !== 'free') return;
+    document.body.classList.remove('idle');
+    clearTimeout(hudTimer);
+    hudTimer = setTimeout(() => {
+      if (document.activeElement === $('pw')) return;
+      document.body.classList.add('idle');
+    }, 3000);
+  }
+  ['mousemove', 'touchstart', 'keydown'].forEach(ev => addEventListener(ev, wake, { passive: true }));
+  wake();
+
+  const wakeLock = () => navigator.wakeLock?.request('screen').catch(() => {});
+  wakeLock(); document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && wakeLock());
+
+  addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
