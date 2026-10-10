@@ -142,24 +142,53 @@
     const cols = Math.ceil(W / cfg.size);
     drops = Array.from({ length: cols }, (_, i) => makeDrop(i * cfg.size, false));
     ctx.fillStyle = '#000300'; ctx.fillRect(0, 0, W, H);
+    heads.clear();
   }
 
-  function drawGlyph(ch, x, y) {
-    const s = cfg.size;
-    if (ch > 'ÿ') { ctx.save(); ctx.translate(x + s, y); ctx.scale(-1, 1); ctx.fillText(ch, 0, 0); ctx.restore(); }
-    else ctx.fillText(ch, x + s * 0.18, y);
+  const fontFor = s => `${s}px "Share Tech Mono", "MS Gothic", "Hiragino Kaku Gothic ProN", monospace`;
+  // Tail colours, precomputed in 32 brightness steps instead of building a string per glyph.
+  const TAIL = Array.from({ length: 33 }, (_, k) => {
+    const a = k / 32;
+    return `rgba(0, ${150 + (a * 105) | 0}, ${30 + (a * 35) | 0}, ${0.35 + a * 0.65})`;
+  });
+
+  // Katakana are drawn mirrored, as in the film. setTransform is cheaper than save/translate/scale/restore.
+  function drawGlyph(c, ch, x, y, s, scale) {
+    if (ch > 'ÿ') { c.setTransform(-scale, 0, 0, scale, (x + s) * scale, y * scale); c.fillText(ch, 0, 0); c.setTransform(scale, 0, 0, scale, 0, 0); }
+    else c.fillText(ch, x + s * 0.18, y);
   }
+
+  // The glowing head glyph is pre-rendered once per character; shadowBlur every frame is very expensive.
+  const heads = new Map();
+  const GLOW = 14;
+  function headSprite(ch) {
+    let img = heads.get(ch);
+    if (img) return img;
+    const s = cfg.size, side = s + 2 * GLOW;
+    img = document.createElement('canvas');
+    img.width = img.height = Math.ceil(side * dpr);
+    const c = img.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.font = fontFor(s); c.textBaseline = 'top';
+    c.shadowColor = '#00ff41'; c.shadowBlur = GLOW;
+    c.fillStyle = '#e8ffe8';
+    drawGlyph(c, ch, GLOW, GLOW, s, dpr);
+    heads.set(ch, img);
+    return img;
+  }
+  // Re-render the heads once the web font arrives, or they keep the fallback font.
+  document.fonts?.addEventListener?.('loadingdone', () => heads.clear());
 
   function step(dt) {
     const s = cfg.size;
-    ctx.fillStyle = 'rgba(0, 3, 0, 0.09)';
+    ctx.fillStyle = `rgba(0, 0, 0, ${(1 - Math.pow(0.91, dt)).toFixed(3)})`;
     ctx.fillRect(0, 0, W, H);
-    ctx.font = `${s}px "Share Tech Mono", "MS Gothic", "Hiragino Kaku Gothic ProN", monospace`;
+    ctx.font = fontFor(s);
     ctx.textBaseline = 'top';
 
     for (const d of drops) {
       if (!d.active) {
-        if (Math.random() < 0.004 * cfg.density) { Object.assign(d, makeDrop(d.x, true)); d.y = -s; d.active = true; }
+        if (Math.random() < 0.004 * cfg.density * dt) { Object.assign(d, makeDrop(d.x, true)); d.y = -s; d.active = true; }
         continue;
       }
       const prevRow = Math.floor(d.y / s);
@@ -167,21 +196,16 @@
       const row = Math.floor(d.y / s);
       for (let r = prevRow + 1; r <= row; r++) d.chars.unshift(pick());
       if (d.chars.length > d.len) d.chars.length = d.len;
-      if (d.chars.length > 2 && Math.random() < 0.06) d.chars[1 + ((Math.random() * (d.chars.length - 1)) | 0)] = pick();
+      if (d.chars.length > 2 && Math.random() < 0.06 * dt) d.chars[1 + ((Math.random() * (d.chars.length - 1)) | 0)] = pick();
 
       for (let i = 1; i < d.chars.length; i++) {
         const y = (row - i) * s;
         if (y < -s || y > H) continue;
-        const a = 1 - i / d.chars.length;
-        ctx.fillStyle = `rgba(0, ${150 + (a * 105) | 0}, ${30 + (a * 35) | 0}, ${0.35 + a * 0.65})`;
-        drawGlyph(d.chars[i], d.x, y);
+        ctx.fillStyle = TAIL[Math.round((1 - i / d.chars.length) * 32)];
+        drawGlyph(ctx, d.chars[i], d.x, y, s, dpr);
       }
       if (row * s < H && d.chars[0]) {
-        ctx.save();
-        ctx.shadowColor = '#00ff41'; ctx.shadowBlur = 14;
-        ctx.fillStyle = '#e8ffe8';
-        drawGlyph(d.chars[0], d.x, row * s);
-        ctx.restore();
+        ctx.drawImage(headSprite(d.chars[0]), d.x - GLOW, row * s - GLOW, s + 2 * GLOW, s + 2 * GLOW);
       }
       if ((row - d.len) * s > H) {
         const on = Math.random() < cfg.density;
@@ -191,11 +215,13 @@
   }
 
   let last = performance.now();
+  // Capped at about 30 fps: plenty for the rain, and 120/144 Hz screens would otherwise draw 4-5x as often.
   function loop(now) {
-    const dt = Math.min((now - last) / 16.67, 3);
+    requestAnimationFrame(loop);
+    if (now - last < 30) return;
+    const dt = Math.min((now - last) / 16.67, 4);
     last = now;
     if (!paused && rainOn) step(dt);
-    requestAnimationFrame(loop);
   }
 
   /* ---------- Controls ---------- */

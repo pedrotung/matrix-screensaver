@@ -132,6 +132,7 @@ struct Step { StepKind kind; std::wstring text; int speed; int ms; };
 
 - (void)startInterlude {
     _inTerminal = YES;
+    _term.needClear = true;
     _screen.clear();
     _steps = {
         {ST_WAIT, L"", 0, 300},

@@ -91,6 +91,10 @@ struct Rain {
     double speed = 1, density = 0.85;
     std::vector<RainGlyph> glyphs;
     std::vector<Drop> drops;
+    // Screen split into s*s tiles; each holds an upper bound on its brightest byte, so the fade
+    // can skip tiles that are already black (most of the screen at any moment).
+    int tw = 0, th = 0;
+    std::vector<uint8_t> tiles;
 
     void Init(int w, int h, int cell, double spd, double dens) {
         W = w; H = h; s = std::max(5, cell); speed = spd; density = dens;
@@ -107,6 +111,8 @@ struct Rain {
             for (size_t k = 0; k < f.size(); k++) g.glow[k] = (uint8_t)std::min(255.f, f[k] * 2.2f);
             glyphs.push_back(std::move(g));
         }
+        tw = (W + s - 1) / s; th = (H + s - 1) / s;
+        tiles.assign(size_t(tw) * th, 255);
         int cols = (W + s - 1) / s;
         drops.assign(cols, Drop{});
         for (int i = 0; i < cols; i++) Reset(drops[i], float(i * s), false);
@@ -125,17 +131,15 @@ struct Rain {
 
     // Alpha-blend a mask in a solid colour. alpha is 0..256.
     static void Blend(PixelBuf& fb, const uint8_t* m, int mw, int mh, int x0, int y0, int r, int g, int b, int alpha, bool additive) {
-        for (int yy = 0; yy < mh; yy++) {
-            int y = y0 + yy;
-            if (y < 0 || y >= fb.h) continue;
-            uint32_t* row = fb.px + size_t(y) * fb.w;
+        int xa = std::max(0, -x0), xb = std::min(mw, fb.w - x0);
+        int ya = std::max(0, -y0), yb = std::min(mh, fb.h - y0);
+        for (int yy = ya; yy < yb; yy++) {
+            uint32_t* row = fb.px + size_t(y0 + yy) * fb.w + x0;
             const uint8_t* mr = m + size_t(yy) * mw;
-            for (int xx = 0; xx < mw; xx++) {
-                int x = x0 + xx;
-                if (x < 0 || x >= fb.w) continue;
+            for (int xx = xa; xx < xb; xx++) {
+                if (!mr[xx]) continue;  // most of a glyph cell is empty
                 int a = (mr[xx] * alpha) >> 8;
-                if (!a) continue;
-                uint32_t p = row[x];
+                uint32_t p = row[xx];
                 int pr = (p >> 16) & 255, pg = (p >> 8) & 255, pb = p & 255;
                 if (additive) {
                     pr = std::min(255, pr + ((r * a) >> 8));
@@ -146,19 +150,34 @@ struct Rain {
                     pg += ((g - pg) * a) >> 8;
                     pb += ((b - pb) * a) >> 8;
                 }
-                row[x] = (uint32_t(pr) << 16) | (uint32_t(pg) << 8) | uint32_t(pb);
+                row[xx] = (uint32_t(pr) << 16) | (uint32_t(pg) << 8) | uint32_t(pb);
             }
         }
     }
 
+    void Mark(int x0, int y0, int w, int h) {
+        int ta = std::max(0, x0 / s), tb = std::min(tw - 1, (x0 + w - 1) / s);
+        int ua = std::max(0, y0 / s), ub = std::min(th - 1, (y0 + h - 1) / s);
+        for (int ty = ua; ty <= ub; ty++) for (int tx = ta; tx <= tb; tx++) tiles[size_t(ty) * tw + tx] = 255;
+    }
+
     void Step(PixelBuf& fb, double dt) {
         // Fade the previous frame for the trailing glow (0.91 per 60 Hz frame).
-        uint32_t f = (uint32_t)std::lround(256.0 * std::pow(0.91, dt));
-        uint32_t* p = fb.px;
-        size_t n = size_t(fb.w) * fb.h;
-        for (size_t i = 0; i < n; i++) {
-            uint32_t v = p[i];
-            p[i] = ((((v & 0x00FF00FFu) * f) >> 8) & 0x00FF00FFu) | ((((v & 0x0000FF00u) * f) >> 8) & 0x0000FF00u);
+        // Done per byte so the compiler turns it into SIMD; this pass touches every pixel and is
+        // most of the frame's cost. The unused top byte is 0 and stays 0.
+        uint16_t f = (uint16_t)std::lround(256.0 * std::pow(0.91, dt));
+        for (int ty = 0; ty < th; ty++) {
+            int ya = ty * s, yb = std::min(fb.h, ya + s);
+            for (int tx = 0; tx < tw; tx++) {
+                uint8_t& t = tiles[size_t(ty) * tw + tx];
+                if (!t) continue;
+                t = uint8_t((t * f) >> 8);
+                int xa = tx * s, n = (std::min(fb.w, xa + s) - xa) * 4;
+                for (int y = ya; y < yb; y++) {
+                    uint8_t* p = reinterpret_cast<uint8_t*>(fb.px + size_t(y) * fb.w + xa);
+                    for (int i = 0; i < n; i++) p[i] = uint8_t((p[i] * f) >> 8);
+                }
+            }
         }
 
         for (Drop& d : drops) {
@@ -178,10 +197,12 @@ struct Rain {
                 int y = (row - i) * s;
                 if (y < -s || y > H) continue;
                 double a = 1.0 - double(i) / nch;
+                Mark((int)d.x, y, s, s);
                 Blend(fb, glyphs[d.chars[i]].mask.data(), s, s, (int)d.x, y, 0, 150 + int(a * 105), 30 + int(a * 35), int((0.35 + a * 0.65) * 256), false);
             }
             if (nch && row * s < H) {
                 const RainGlyph& g = glyphs[d.chars[0]];
+                Mark((int)d.x - pad, row * s - pad, s + 2 * pad, s + 2 * pad);
                 Blend(fb, g.glow.data(), s + 2 * pad, s + 2 * pad, (int)d.x - pad, row * s - pad, 0, 255, 65, 256, true);
                 Blend(fb, g.mask.data(), s, s, (int)d.x, row * s, 232, 255, 232, 256, false);
             }
@@ -206,6 +227,7 @@ struct Terminal {
     std::wstring shown;
     bool cursorOn = true, cursorSolid = false;
     bool dirty = true;
+    bool needClear = true;  // set when the terminal opens, so other monitors are blanked once, not every frame
 
     void Init(int originX, int originY, int w, int h, double dpiScale) {
         ox = originX; oy = originY; PW = w; PH = h;
@@ -327,7 +349,7 @@ struct Terminal {
 
     void Render(PixelBuf& fb, double flicker) {
         if (dirty) Rebuild();
-        fb.Clear(0);
+        if (needClear) { fb.Clear(0); needClear = false; }
         const int bgR = 2, bgG = 10, bgB = 3;      // tube black
         const int fgR = 57, fgG = 255, fgB = 90;   // Apple II monitor green
         int fl = int(flicker * 256);

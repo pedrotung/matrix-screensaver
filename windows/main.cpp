@@ -185,6 +185,7 @@ static void StartSteps(std::vector<Step> s) {
 static void OpenTerminal() {
     if (g.mode == MODE_TERM) return;
     g.mode = MODE_TERM;
+    g.term.needClear = true;
     g.accepting = false;
     g.screen.clear();
     StartSteps({
@@ -407,7 +408,7 @@ static int RunSaver(HWND parent) {
     g.last = NowMs();
     g.armedAt = g.last;
     timeBeginPeriod(1);
-    SetTimer(g.hwnd, 1, 16, nullptr);
+    SetTimer(g.hwnd, 1, 33, nullptr);  // 30 fps is plenty for the rain and halves the CPU cost
 
     MSG m;
     while (GetMessageW(&m, nullptr, 0, 0) > 0) {
